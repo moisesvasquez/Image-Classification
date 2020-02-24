@@ -29,6 +29,10 @@ The script binds each generated row together and writes a csv file called `image
 
 The script `ImageClassifer.R` uses `h2o` to generate the Naive Bayes, Deep Learning, and Random Forest models, and it uses `kernlab` to generate the Support Vector Machine model.
 
+##### Usage
+For a more detailed explanation of each step of the process, read the R Notebook file `images.Rmd` or the html version `images.nb.html`.
+For a more straing forward process, use the scripts `GetNumbersImages.R` and `ImageClassifer.R`. You can make necesary changes to these files to adapt to your project.
+
 ### Results
 
 
