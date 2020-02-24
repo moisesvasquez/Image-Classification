@@ -1,0 +1,328 @@
+---
+title: "Image Classification with R"
+output: html_notebook
+---
+The objective of this project is to classify large amounts of images using R. The classification is to be made using 4 different models:
+
+* Naïve Bayes
+* Random Forest
+* Deep Learning
+* Support Vector Machines
+
+Load Required Libraries
+```{r}
+library(imager)
+library(tidyverse)
+library(h2o)
+library(kernlab)
+```
+
+
+#### Formula
+
+Formula to generate a single row of 1 label and 75 features for an image
+```{r}
+getNumbers <- function(image,label){
+# Load image 
+im <- load.image(image)
+# Detect edges and set standard size
+im <- deriche(im,2,order=2,axis="x") %>% deriche(2,order=2,axis="y") %>% resize(50,50)
+# Convert to Data Frame
+df <- as.data.frame(im)
+# Add Label
+row <- data.frame(Label = label)
+# Separate Colors
+R <- subset(df,df$cc == 1)
+G <- subset(df,df$cc == 2)
+B <- subset(df,df$cc == 3)
+# Create Grouping Vectors
+c10 <- c(1:10)
+c20 <- c(11:20)
+c30 <- c(21:30)
+c40 <- c(31:40)
+c50 <- c(41:50)
+
+# 3 Loops, one for each Color  of RGB
+
+# Loop through X
+for(i in 1:5) {
+  x <- i
+  # Change the Grouping Vector depending on x itteration
+  onX <- case_when(x == 1 ~ c10,
+                   x == 2 ~ c20,
+                   x == 3 ~ c30,
+                   x == 4 ~ c40,
+                   x == 5 ~ c50)
+  # Loop through y
+  for (j in 1:5) {
+    y <- j
+    # Change the Grouping Vector depending on y itteration
+    onY <- case_when(y == 1 ~ c10,
+                     y == 2 ~ c20,
+                     y == 3 ~ c30,
+                     y == 4 ~ c40,
+                     y == 5 ~ c50)
+    # Change name of each column 
+    valName <- paste0("x", i, "y", j, ".R")
+    # Group based on the coordiate's groups
+    temp <-
+      R %>% filter(x %in% onX &
+                     y %in% onY) %>% summarize(val = mean(value))
+    colnames(temp) <- valName
+    # Add to the row data frame
+    row <- cbind(row, temp)
+  }
+  
+}
+# Repeat proces for G
+for(i in 1:5) {
+  x <- i
+  onX <- case_when(x == 1 ~ c10,
+                   x == 2 ~ c20,
+                   x == 3 ~ c30,
+                   x == 4 ~ c40,
+                   x == 5 ~ c50)
+  for (j in 1:5) {
+    y <- j
+    onY <- case_when(y == 1 ~ c10,
+                     y == 2 ~ c20,
+                     y == 3 ~ c30,
+                     y == 4 ~ c40,
+                     y == 5 ~ c50)
+    valName <- paste0("x", i, "y", j, ".G")
+    temp <-
+      G %>% filter(x %in% onX &
+                     y %in% onY) %>% summarize(val = mean(value))
+    colnames(temp) <- valName
+    row <- cbind(row, temp)
+  }
+  
+}
+# Repeat Process for B
+for(i in 1:5) {
+  x <- i
+  onX <- case_when(x == 1 ~ c10,
+                   x == 2 ~ c20,
+                   x == 3 ~ c30,
+                   x == 4 ~ c40,
+                   x == 5 ~ c50)
+  for (j in 1:5) {
+    y <- j
+    onY <- case_when(y == 1 ~ c10,
+                     y == 2 ~ c20,
+                     y == 3 ~ c30,
+                     y == 4 ~ c40,
+                     y == 5 ~ c50)
+    valName <- paste0("x", i, "y", j, ".B")
+    temp <-
+      B %>% filter(x %in% onX &
+                     y %in% onY) %>% summarize(val = mean(value))
+    colnames(temp) <- valName
+    row <- cbind(row, temp)
+  }
+  
+}
+# Return Final Data Set
+return(row)
+}
+
+```
+
+
+#### Convert to Numbers
+
+Loop throught all the files two separate folders, use `getNumbers()` for each image and 
+```{r}
+# List the files of the Cars Folder
+Car_files <-
+  list.files(path = "C:/Users/moise/Documents/R/STU/Spring 2020/Cars")
+# Create Empty Data Frame
+Cars <- data.frame()
+
+# Loop each file
+for (i in 1:length(Car_files)) {
+  # Get the path for each photo
+  foto <- paste0("Cars/", Car_files[i])
+  # Use formula to generate the numbers and assign the label "Car"
+  data <- getNumbers(foto, "Car")
+  # Bind Each Result together
+  Cars <- rbind(Cars, data)
+}
+
+# Repeat process for the images that are not Cars
+No_Cars_files <-
+  list.files(path = "C:/Users/moise/Documents/R/STU/Spring 2020/Not_Cars")
+Not_Cars <- data.frame()
+
+for (i in 1:length(No_Cars_files)) {
+  foto <- paste0("Not_Cars/", No_Cars_files[i])
+  data <- getNumbers(foto, "Not_Car")
+  Not_Cars <- rbind(Not_Cars, data)
+}
+# Bind Cars and Not Cars data frames.
+Data <- rbind(Cars,Not_Cars)
+# Change the labels to factors
+Data$Label <- as.factor(Data$Label)
+```
+
+## Models
+
+H2o Split
+
+```{r}
+# Use all CPU threads
+h2o.init(nthreads = -1)
+
+SPLIT_RATIO = .75
+h2oCars <- as.h2o(Data)
+carsSplit <- h2o.splitFrame(data = h2oCars, ratios = SPLIT_RATIO)
+h2oTrain <- carsSplit[[1]]
+h2oTest <- carsSplit[[2]]
+```
+
+### DEEP LEARNING
+```{r}
+h2oDL <- h2o.deeplearning(
+  x = colnames(h2oTrain),
+  y = c("Label"),
+  training_frame = h2oTrain,
+  hidden = c(16, 8),
+  epochs = 100,
+  seed = 12345,
+  nfolds = 3
+)
+
+
+pred <- h2o.predict(h2oDL, h2oTest)
+result_DLh2o <- data.frame(Actual = as.vector(h2oTest$Label), Prediction = as.vector(pred$predict))
+
+# TP,TN, FP, FN
+TPDl <- subset(result_DLh2o, Actual == "Car" & Prediction == "Car" )
+TNDl <- subset(result_DLh2o, Actual == "No_Car" & Prediction == "No_Car")
+FPDl <- subset(result_DLh2o, Actual == "No_Car" & Prediction == "Car")
+FNDl <- subset(result_DLh2o, Actual == "Car" & Prediction == "No_Car")
+
+# Accuracy
+accuracyDL <- (nrow(TPDl)) / (nrow(TPDl) + nrow(FPDl))
+cat("Deep Learning Accuracy:" , accuracyDL, "\n")
+
+# Precision
+precisionDL <- (nrow(TPDl)) / (nrow(h2oTest))
+cat("Deep Learning Precision:" , precisionDL, "\n")
+
+# Recall
+recallDL <- (nrow(TPDl)) / (nrow(TPDl) + nrow(FNDl))
+cat("Deep Learning Recall:" , recallDL, "\n")
+
+# Performance
+rfPerformance <- h2o.performance(h2oDL, h2oTest)
+
+# Auc
+h2oDlAUC <- h2o.auc(rfPerformance)
+cat("Deep Learning AuC:", h2oDlAUC, "\n")
+```
+
+### RANDOM FOREST
+```{r}
+rfModel <-
+  h2o.randomForest(y = "Label",
+                   training_frame = h2oTrain,
+                   validation_frame = h2oTest)
+
+rfPred <- h2o.predict(rfModel, h2oTest)
+result_RFh2o <- data.frame(Actual = as.vector(h2oTest$Label), Prediction = as.vector(rfPred$predict))
+
+# TP,TN, FP, FN
+TPRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "Car" )
+TNRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "No_Car")
+FPRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "Car")
+FNRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "No_Car")
+
+# Accuracy
+accuracyRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
+cat("Random Forest Accuracy:" , accuracyRf, "\n")
+
+# Precision
+precisionRf <- (nrow(TPRf)) / (nrow(h2oTest))
+cat("Random Forest Precision:" , precisionRf, "\n")
+
+# Recall
+recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
+cat("Random Forest Recall:" , recallRf, "\n")
+
+# Performance
+rfPerformance <- h2o.performance(rfModel, h2oTest)
+
+# Auc
+h2oRfAUC <- h2o.auc(rfPerformance)
+cat("Random Forest AuC:", h2oRfAUC, "\n")
+```
+### NAIVE BAYES
+```{r}
+nbModel <-
+  h2o.naiveBayes(y = "Label",
+                   training_frame = h2oTrain,
+                   validation_frame = h2oTest)
+
+nbPred <- h2o.predict(nbModel, h2oTest)
+result_RFh2o <- data.frame(Actual = as.vector(h2oTest$Label), Prediction = as.vector(nbPred$predict))
+
+# TP,TN, FP, FN
+TPRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "Car" )
+TNRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "No_Car")
+FPRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "Car")
+FNRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "No_Car")
+
+# Accuracy
+accuracyRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
+cat("Naive Bayes Accuracy:" , accuracyRf, "\n")
+
+# Precision
+precisionRf <- (nrow(TPRf)) / (nrow(h2oTest))
+cat("Naive Bayes Precision:" , precisionRf, "\n")
+
+# Recall
+recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
+cat("Naive Bayes Recall:" , recallRf, "\n")
+
+# Performance
+rfPerformance <- h2o.performance(nbModel, h2oTest)
+
+# Auc
+h2oRfAUC <- h2o.auc(rfPerformance)
+cat("Naive Bayes AuC:", h2oRfAUC, "\n")
+```
+### SVM
+
+Regular Split
+```{r}
+sample <- sample.split(Data$Label, SplitRatio = .75)
+train <- subset(Data, sample == TRUE)
+test <- subset(Data, sample == FALSE)
+```
+
+```{r}
+modelSVM <- ksvm(Label ~ ., data = train, kernel = "rbfdot")
+
+predSVM <- predict(modelSVM,test)
+result_SVM <- data.frame(Actual = test$Label, Prediction = predSVM)
+
+# TP,TN, FP, FN
+TPRf <- subset(result_SVM, Actual == "Car" & Prediction == "Car" )
+TNRf <- subset(result_SVM, Actual == "No_Car" & Prediction == "No_Car")
+FPRf <- subset(result_SVM, Actual == "No_Car" & Prediction == "Car")
+FNRf <- subset(result_SVM, Actual == "Car" & Prediction == "No_Car")
+
+# Accuracy
+accuracyRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
+cat("Gaussian RBF Kernel Accuracy:" , accuracyRf, "\n")
+
+# Precision
+precisionRf <- (nrow(TPRf)) / (nrow(h2oTest))
+cat("Gaussian RBF Kernel Precision:" , precisionRf, "\n")
+
+# Recall
+recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
+cat("Gaussian RBF Kernel Recall:" , recallRf, "\n")
+
+```
