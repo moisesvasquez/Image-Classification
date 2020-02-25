@@ -39,7 +39,8 @@ h2oDL <- h2o.deeplearning(
 
 pred <- h2o.predict(h2oDL, h2oTest)
 result_DLh2o <- data.frame(Actual = as.vector(h2oTest$Label), Prediction = as.vector(pred$predict))
-
+result_DLh2o$Model <- "Deep Learning"
+result_DLh2o$Accurate <- ifelse(result_DLh2o$Actual == result_DLh2o$Prediction,1,0)
 # TP,TN, FP, FN
 TPDl <- subset(result_DLh2o, Actual == "Car" & Prediction == "Car" )
 TNDl <- subset(result_DLh2o, Actual == "No_Car" & Prediction == "No_Car")
@@ -71,7 +72,8 @@ cat("~~~~~ RANDOM FOREST ~~~~~","\n")
 forest <- randomForest(Label ~ ., data = train)
 predictionForest <- predict(forest, test, type = "class")
 result_RFh2o <- data.frame(Actual = test$Label, Prediction = predictionForest)
-
+result_RFh2o$Model <- "Random Forest"
+result_RFh2o$Accurate <- ifelse(result_RFh2o$Actual == result_RFh2o$Prediction,1,0)
 # TP,TN, FP, FN
 TPRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "Car" )
 TNRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "No_Car")
@@ -102,6 +104,8 @@ nbModel <-
 
 nbPred <- predict(nbModel,test)
 result_NBh2o <- data.frame(Actual = test$Label, Prediction = nbPred)
+result_NBh2o$Model <- "Naive Bayes"
+result_NBh2o$Accurate <- ifelse(result_NBh2o$Actual == result_NBh2o$Prediction,1,0)
 
 # TP,TN, FP, FN
 TPNB <- subset(result_NBh2o, Actual == "Car" & Prediction == "Car" )
@@ -132,7 +136,8 @@ modelSVM <- ksvm(Label ~ ., data = train, kernel = "rbfdot",C = 5)
 
 predSVM <- predict(modelSVM,test)
 result_SVM <- data.frame(Actual = test$Label, Prediction = predSVM)
-
+result_SVM$Model <- "SVM"
+result_SVM$Accurate <- ifelse(result_SVM$Actual == result_SVM$Prediction,1,0)
 # TP,TN, FP, FN
 TPSVM <- subset(result_SVM, Actual == "Car" & Prediction == "Car" )
 TNSVM <- subset(result_SVM, Actual == "No_Car" & Prediction == "No_Car")
@@ -155,4 +160,13 @@ cat("Support Vector Machine Recall:" , recallSVM, "\n")
 AUCSVM <- auc(roc(predSVM,test$Label))
 cat("Support Vector Machine AUC:" , AUCSVM, "\n")
 
+# HYPOTESIS TESING
+cat("~~~~~ HYPOTESIS TESING ~~~~~","\n")
 
+for_Anova <- rbind(result_SVM,result_NBh2o,result_RFh2o,result_DLh2o)
+AccuracyAOV <- aov(Accurate ~ Model, data = for_Anova)
+print(summary(AccuracyAOV))
+cat("As the p-value is less than the significance level 0.05, we can conclude that there are significant differences between the accuracies of the models","\n")
+cat("Tukey Test to see which models are significantly different","\n")
+TukeyAccuracies <- TukeyHSD(AccuracyAOV)
+print(TukeyAccuracies)
