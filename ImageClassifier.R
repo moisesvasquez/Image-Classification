@@ -3,29 +3,38 @@ library(h2o)
 library(kernlab)
 library(tidyverse)
 library(caTools)
+library(naivebayes)
+library(randomForest)
 
 # Import File
 Data <- read.csv("images.csv")
-
+Data <- Data[,-1]
 # Use all CPU threads
 h2o.init(nthreads = -1)
 
-SPLIT_RATIO = .75
+SPLIT_RATIO = .85
+# H2o Split
 h2oCars <- as.h2o(Data)
 carsSplit <- h2o.splitFrame(data = h2oCars, ratios = SPLIT_RATIO)
 h2oTrain <- carsSplit[[1]]
 h2oTest <- carsSplit[[2]]
 
+# Regular Split
+sample <- sample.split(Data$Label, SplitRatio = SPLIT_RATIO)
+train <- subset(Data, sample == TRUE)
+test <- subset(Data, sample == FALSE)
+
 # DEEP LEARNING
+cat("~~~~~ DEEP LEARNING ~~~~~","\n")
 
 h2oDL <- h2o.deeplearning(
   x = colnames(h2oTrain),
   y = c("Label"),
   training_frame = h2oTrain,
-  hidden = c(16, 8),
+  hidden = c(16, 16, 16),
   epochs = 100,
   seed = 12345,
-  nfolds = 3
+  nfolds = 4
 )
 
 pred <- h2o.predict(h2oDL, h2oTest)
@@ -38,11 +47,11 @@ FPDl <- subset(result_DLh2o, Actual == "No_Car" & Prediction == "Car")
 FNDl <- subset(result_DLh2o, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
-accuracyDL <- (nrow(TPDl)) / (nrow(TPDl) + nrow(FPDl))
+accuracyDL <- (nrow(TPDl)) / (nrow(h2oTest))
 cat("Deep Learning Accuracy:" , accuracyDL, "\n")
 
 # Precision
-precisionDL <- (nrow(TPDl)) / (nrow(h2oTest))
+precisionDL <- (nrow(TPDl)) / (nrow(TPDl) + nrow(FPDl))
 cat("Deep Learning Precision:" , precisionDL, "\n")
 
 # Recall
@@ -58,13 +67,10 @@ cat("Deep Learning AuC:", h2oDlAUC, "\n")
 
 
 # RANDOM FOREST
-rfModel <-
-  h2o.randomForest(y = "Label",
-                   training_frame = h2oTrain,
-                   validation_frame = h2oTest)
-
-rfPred <- h2o.predict(rfModel, h2oTest)
-result_RFh2o <- data.frame(Actual = as.vector(h2oTest$Label), Prediction = as.vector(rfPred$predict))
+cat("~~~~~ RANDOM FOREST ~~~~~","\n")
+forest <- randomForest(Label ~ ., data = train)
+predictionForest <- predict(forest, test, type = "class")
+result_RFh2o <- data.frame(Actual = test$Label, Prediction = predictionForest)
 
 # TP,TN, FP, FN
 TPRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "Car" )
@@ -73,88 +79,68 @@ FPRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "Car")
 FNRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
-accuracyRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
+accuracyRf <- (nrow(TPRf)) / (nrow(h2oTest))
 cat("Random Forest Accuracy:" , accuracyRf, "\n")
 
 # Precision
-precisionRf <- (nrow(TPRf)) / (nrow(h2oTest))
+precisionRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
 cat("Random Forest Precision:" , precisionRf, "\n")
 
 # Recall
 recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
 cat("Random Forest Recall:" , recallRf, "\n")
 
-# Performance
-rfPerformance <- h2o.performance(rfModel, h2oTest)
-
-# Auc
-h2oRfAUC <- h2o.auc(rfPerformance)
-cat("Random Forest AuC:", h2oRfAUC, "\n")
-
 # NAIVE BAYES
+cat("~~~~~ NAIVE BAYES ~~~~~","\n")
 
 nbModel <-
-  h2o.naiveBayes(y = "Label",
-                 training_frame = h2oTrain,
-                 validation_frame = h2oTest)
+  naive_bayes(Label ~ ., data = train)
 
-nbPred <- h2o.predict(nbModel, h2oTest)
-result_RFh2o <- data.frame(Actual = as.vector(h2oTest$Label), Prediction = as.vector(nbPred$predict))
+nbPred <- predict(naive2,test)
+result_NBh2o <- data.frame(Actual = test$Label, Prediction = nbPred)
 
 # TP,TN, FP, FN
-TPRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "Car" )
-TNRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "No_Car")
-FPRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "Car")
-FNRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "No_Car")
+TPNB <- subset(result_NBh2o, Actual == "Car" & Prediction == "Car" )
+TNNB <- subset(result_NBh2o, Actual == "No_Car" & Prediction == "No_Car")
+FPNB <- subset(result_NBh2o, Actual == "No_Car" & Prediction == "Car")
+FNNB <- subset(result_NBh2o, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
-accuracyRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
-cat("Naive Bayes Accuracy:" , accuracyRf, "\n")
+accuracyNB <- (nrow(TPNB)) / nrow(h2oTest)
+cat("Naive Bayes Accuracy:" , accuracyNB, "\n")
 
 # Precision
-precisionRf <- (nrow(TPRf)) / (nrow(h2oTest))
-cat("Naive Bayes Precision:" , precisionRf, "\n")
+precisionNB <- (nrow(TPNB)) / (nrow(TPNB) + nrow(FPNB))
+cat("Naive Bayes Precision:" , precisionNB, "\n")
 
 # Recall
-recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
-cat("Naive Bayes Recall:" , recallRf, "\n")
-
-# Performance
-rfPerformance <- h2o.performance(nbModel, h2oTest)
-
-# Auc
-h2oRfAUC <- h2o.auc(rfPerformance)
-cat("Naive Bayes AuC:", h2oRfAUC, "\n")
+recallNB <- (nrow(TPNB)) / (nrow(TPNB) + nrow(FNNB))
+cat("Naive Bayes Recall:" , recallNB, "\n")
 
 # SVM
-# Regular Split
-sample <- sample.split(Data$Label, SplitRatio = .75)
-train <- subset(Data, sample == TRUE)
-test <- subset(Data, sample == FALSE)
+cat("~~~~~ SUPPORT VECTOR MACHINE ~~~~~","\n")
 
-
-
-modelSVM <- ksvm(Label ~ ., data = train, kernel = "rbfdot")
+modelSVM <- ksvm(Label ~ ., data = train, kernel = "rbfdot",C = 5)
 
 predSVM <- predict(modelSVM,test)
 result_SVM <- data.frame(Actual = test$Label, Prediction = predSVM)
 
 # TP,TN, FP, FN
-TPRf <- subset(result_SVM, Actual == "Car" & Prediction == "Car" )
-TNRf <- subset(result_SVM, Actual == "No_Car" & Prediction == "No_Car")
-FPRf <- subset(result_SVM, Actual == "No_Car" & Prediction == "Car")
-FNRf <- subset(result_SVM, Actual == "Car" & Prediction == "No_Car")
+TPSVM <- subset(result_SVM, Actual == "Car" & Prediction == "Car" )
+TNSVM <- subset(result_SVM, Actual == "No_Car" & Prediction == "No_Car")
+FPSVM <- subset(result_SVM, Actual == "No_Car" & Prediction == "Car")
+FNSVM <- subset(result_SVM, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
-accuracyRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FPRf))
-cat("Gaussian RBF Kernel Accuracy:" , accuracyRf, "\n")
+accuracySVM <- (nrow(TPSVM)) / (nrow(test))
+cat("Gaussian RBF Kernel Accuracy:" , accuracySVM, "\n")
 
 # Precision
-precisionRf <- (nrow(TPRf)) / (nrow(h2oTest))
-cat("Gaussian RBF Kernel Precision:" , precisionRf, "\n")
+precisionSVM <- (nrow(TPSVM)) / (nrow(TPSVM) + nrow(FPSVM))
+cat("Gaussian RBF Kernel Precision:" , precisionSVM, "\n")
 
 # Recall
-recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
-cat("Gaussian RBF Kernel Recall:" , recallRf, "\n")
+recallSVM <- (nrow(TPSVM)) / (nrow(TPSVM) + nrow(FNSVM))
+cat("Gaussian RBF Kernel Recall:" , recallSVM, "\n")
 
 
