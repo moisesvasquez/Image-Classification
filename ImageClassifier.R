@@ -79,7 +79,7 @@ FPRf <- subset(result_RFh2o, Actual == "No_Car" & Prediction == "Car")
 FNRf <- subset(result_RFh2o, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
-accuracyRf <- (nrow(TPRf)) / (nrow(h2oTest))
+accuracyRf <- (nrow(TPRf)) / (nrow(test))
 cat("Random Forest Accuracy:" , accuracyRf, "\n")
 
 # Precision
@@ -90,13 +90,17 @@ cat("Random Forest Precision:" , precisionRf, "\n")
 recallRf <- (nrow(TPRf)) / (nrow(TPRf) + nrow(FNRf))
 cat("Random Forest Recall:" , recallRf, "\n")
 
+#Auc
+AUCRF <- auc(roc(predictionForest,test$Label))
+cat("Random Forest AUC:" , AUCRF, "\n")
+
 # NAIVE BAYES
 cat("~~~~~ NAIVE BAYES ~~~~~","\n")
 
 nbModel <-
   naive_bayes(Label ~ ., data = train)
 
-nbPred <- predict(naive2,test)
+nbPred <- predict(nbModel,test)
 result_NBh2o <- data.frame(Actual = test$Label, Prediction = nbPred)
 
 # TP,TN, FP, FN
@@ -106,7 +110,7 @@ FPNB <- subset(result_NBh2o, Actual == "No_Car" & Prediction == "Car")
 FNNB <- subset(result_NBh2o, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
-accuracyNB <- (nrow(TPNB)) / nrow(h2oTest)
+accuracyNB <- (nrow(TPNB)) / nrow(test)
 cat("Naive Bayes Accuracy:" , accuracyNB, "\n")
 
 # Precision
@@ -116,6 +120,10 @@ cat("Naive Bayes Precision:" , precisionNB, "\n")
 # Recall
 recallNB <- (nrow(TPNB)) / (nrow(TPNB) + nrow(FNNB))
 cat("Naive Bayes Recall:" , recallNB, "\n")
+
+#Auc
+AUCNB <- auc(roc(nbPred,test$Label))
+cat("Naive Bayes AUC:" , AUCNB, "\n")
 
 # SVM
 cat("~~~~~ SUPPORT VECTOR MACHINE ~~~~~","\n")
@@ -133,14 +141,18 @@ FNSVM <- subset(result_SVM, Actual == "Car" & Prediction == "No_Car")
 
 # Accuracy
 accuracySVM <- (nrow(TPSVM)) / (nrow(test))
-cat("Gaussian RBF Kernel Accuracy:" , accuracySVM, "\n")
+cat("Support Vector Machine Accuracy:" , accuracySVM, "\n")
 
 # Precision
 precisionSVM <- (nrow(TPSVM)) / (nrow(TPSVM) + nrow(FPSVM))
-cat("Gaussian RBF Kernel Precision:" , precisionSVM, "\n")
+cat("Support Vector Machine Precision:" , precisionSVM, "\n")
 
 # Recall
 recallSVM <- (nrow(TPSVM)) / (nrow(TPSVM) + nrow(FNSVM))
-cat("Gaussian RBF Kernel Recall:" , recallSVM, "\n")
+cat("Support Vector Machine Recall:" , recallSVM, "\n")
+
+#Auc
+AUCSVM <- auc(roc(predSVM,test$Label))
+cat("Support Vector Machine AUC:" , AUCSVM, "\n")
 
 
