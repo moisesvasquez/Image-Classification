@@ -34,6 +34,33 @@ For a more detailed explanation of each step of the process, read the R Notebook
 For a more straing forward process, use the scripts `GetNumbersImages.R` and `ImageClassifer.R`. You can make necesary changes to these files to adapt to your project.
 
 ### Results
+Accuracy of the models was very low. 
 
+| |Accurracy|Precition|Recall|AUC|
+|:--|:-:|:-:|:-:|:-:|
+|Naive Bayes|.50|1|1|.63|
+|Random Forest|.52|1|1|.71|
+|Deep Learning|.45|1|1|.70|
+|Support Vector Machine|.52|1|1|.67|
 
+### Working Rest API
+A working API has been developed to classify images via the Naive Bayes Model
+
+###### Interact With API
+To Interact with the API, got the the base url `http://ec2-34-207-87-151.compute-1.amazonaws.com:8080/images?img=` and append a url for any image in the internet. The API will return it's classification.
+The API is hosted on a AWS Linux EC2 intance. 
+
+###### Example
+For the example we are using this image: 
+   
+![BMW IMAGE](https://img.car.com/2019/bmw/m2/48966_11_2_320x.png)
+   
+Go To `http://ec2-34-207-87-151.compute-1.amazonaws.com:8080/images?img=https://img.car.com/2019/bmw/m2/48966_11_2_320x.png` or click [HERE](http://ec2-34-207-87-151.compute-1.amazonaws.com:8080/images?img=https://img.car.com/2019/bmw/m2/48966_11_2_320x.png)
+
+#### Host Own API
+The API is using library `plumber`. Edit files `LiveDemo.R` and `plumber.R` to create your own image classification API.
+
+- `LiveDemo.R` Has the code for the model, this script requieres the `imagesFull.csv` file that contains all the numbers generated with `GetNumbersImages.R`
+
+- `plumber.R` defines the parameters and methods for the API. Read more about `plumber` [here](https://www.rplumber.io/docs/index.html)
 
